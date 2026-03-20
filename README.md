@@ -4,7 +4,7 @@
 
 Food delivery workers earn most of their income during peak hour, yet disruptions like social curfews, festivals, restaurant shutdowns, and extreme weather conditions can completely stop their earnings.
 
-Our solution provides a **zero touch AI powered insurance system** that automatically compensates their income loss.
+Our solution provides a **AI powered insurance system** that automatically compensates their income loss.
 
 ---
 
