@@ -69,7 +69,7 @@ The system detects environmental/social factors, checks the working location of 
 
 ## Application Workflow
 
-*(Refer to napkin flow diagram)*
+![WhatsApp Image 2026-03-19 at 10 57 16 PM](https://github.com/user-attachments/assets/3a9c5bc0-aed1-4e3e-8f6a-3c93faa9dc7a)
 
 ---
 
