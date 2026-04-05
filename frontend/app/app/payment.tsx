@@ -16,7 +16,6 @@ export default function Payments() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const salary = Number(params.salary);
-  console.log("salary",salary);
   const type = params.type as string;
   
 

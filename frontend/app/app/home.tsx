@@ -75,9 +75,11 @@ export default function Home() {
 
   // 🌍 REAL ENVIRONMENT API (CHENNAI)
   const fetchEnvData = async () => {
+    const API_KEY = "37f63416af21b6fc12124708ac26df4c";
+    const city = userData?.location || "Chennai";
     try {
       const weatherRes = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?q=Chennai&appid=${API_KEY}&units=metric`
+        `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`
       );
       const weatherData = await weatherRes.json();
 
@@ -106,93 +108,152 @@ export default function Home() {
     return await res.json();
   };
 
-  // 🔥 AUTOMATIC DAILY TRIGGER
   useEffect(() => {
-    const runDailyTrigger = async () => {
-      try {
-        const user = auth.currentUser;
-        if (!user) return;
+  const runDailyTrigger = async () => {
+    console.log(" runDailyTrigger started");
 
-        const userRef = doc(db, "users", user.uid);
-        const snap = await getDoc(userRef);
-        if (!snap.exists()) return;
+    // const env = {
+    //   rain: 160,
+    //   temperature: 40,
+    //   aqi: 20,
+    // };
 
-        const data = snap.data();
-        const lastTrigger = data.lastTriggerDate
-          ? new Date(data.lastTriggerDate.seconds * 1000)
-          : null;
+    // const admin = {
+    //   curfew: 0,
+    //   festival: 1,
+    // };
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
 
-        const isAlreadyTriggeredToday =
-          lastTrigger && lastTrigger.setHours(0, 0, 0, 0) === today.getTime();
+      const userRef = doc(db, "users", user.uid);
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) return;
 
-        if (isAlreadyTriggeredToday) {
-          console.log("Trigger already run today");
-          setCredits(data.credits || 0);
-          return;
-        }
+      const data = snap.data();
 
-        const env = await fetchEnvData();
+      
+      const isSameDay = (d1: Date, d2: Date) =>
+        d1.toDateString() === d2.toDateString();
+
+      const lastTrigger = data.lastTriggerDate
+        ? new Date(data.lastTriggerDate.seconds * 1000)
+        : null;
+
+      if (lastTrigger && isSameDay(lastTrigger, new Date())) {
+        console.log(" Already triggered today");
+        return;
+      }
+
+      const history = data.triggerHistory || [];
+
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      const triggersThisWeek = history.filter((t: any) => {
+        const tDate = t.date?.seconds
+          ? new Date(t.date.seconds * 1000)
+          : new Date(t.date);
+        return tDate >= startOfWeek;
+      });
+
+      if (triggersThisWeek.length >= 3) {
+        console.log(" Weekly limit reached");
+        return;
+      }
+        const env = await fetchEnvData(); 
         const admin = await fetchAdminData();
 
-        let payouts: number[] = [];
-        let reasons: string[] = [];
+      const maxPayout: any = {
+        low: 45,
+        medium: 79,
+        high: 108,
+      };
 
-        if (env.rain >= 80 && env.rain <= 100) {
-          payouts.push(23);
-          reasons.push("Moderate Rain");
-        }
-        if (env.rain > 100) {
-          payouts.push(45);
-          reasons.push("Heavy Rain");
-        }
-        if (env.temperature > 45) {
-          payouts.push(32);
-          reasons.push("Extreme Heat");
-        }
-        if (env.aqi > 150) {
-          payouts.push(32);
-          reasons.push("High Pollution");
-        }
-        if (admin.curfew === 1) {
-          payouts.push(45);
-          reasons.push("Curfew");
-        }
-        if (admin.festival === 1) {
-          payouts.push(23);
-          reasons.push("Festival");
-        }
+      const contribution: any = {
+        lowRain: 0.5,
+        highRain: 1.0,
+        heat: 0.5,
+        aqi: 0.5,
+        curfew: 1.0,
+        festival: 0.5,
+      };
 
-        if (payouts.length === 0) {
-          console.log("No trigger conditions today");
-          return;
-        }
+      const risk = data.riskLevel || "low";
+      const max = maxPayout[risk];
 
-        const finalPayout = Math.max(...payouts);
-        const newCredits = (data.credits || 0) + finalPayout;
+      let factors: any[] = [];
 
-        await setDoc(
-          userRef,
-          { credits: newCredits, lastTriggerDate: new Date() },
-          { merge: true }
-        );
+      if (env.rain >= 80 && env.rain <= 100)
+        factors.push({ value: contribution.lowRain, reason: "Low Rain" });
 
-        setCredits(newCredits);
+      if (env.rain > 100)
+        factors.push({ value: contribution.highRain, reason: "High Rain" });
 
-        console.log(
-          `Trigger activated automatically: ${reasons.join(
-            ", "
-          )} → ₹${finalPayout} added`
-        );
-      } catch (err) {
-        console.log("Automatic trigger error:", err);
+      if (env.temperature > 40)
+        factors.push({ value: contribution.heat, reason: "Heat" });
+
+      if (env.aqi > 150)
+        factors.push({ value: contribution.aqi, reason: "AQI" });
+
+      if (admin.curfew === 1)
+        factors.push({ value: contribution.curfew, reason: "Curfew" });
+
+      if (admin.festival === 1)
+        factors.push({ value: contribution.festival, reason: "Festival" });
+
+      if (factors.length === 0) {
+        console.log(" No trigger conditions");
+        return;
       }
-    };
 
-    runDailyTrigger();
-  }, []);
+      const best = factors.reduce((a, b) =>
+        b.value > a.value ? b : a
+      );
+
+      const finalPayout = Math.round(best.value * max);
+      const newCredits = (data.credits || 0) + finalPayout;
+
+      const updatedHistory = [
+        ...(data.triggerHistory || []),
+        {
+          date: new Date(),
+          amount: finalPayout,
+          reason: best.reason,
+        },
+      ];
+
+      await setDoc(
+        userRef,
+        {
+          credits: newCredits,
+          lastTriggerDate: new Date(),
+          triggerHistory: updatedHistory,
+        },
+        { merge: true }
+      );
+
+      setCredits(newCredits);
+
+      setUserData((prev: any) => ({
+        ...prev,
+        credits: newCredits,
+        triggerHistory: updatedHistory,
+      }));
+
+      console.log(
+        ` Trigger: ${best.reason} → ₹${finalPayout} (Risk: ${risk})`
+      );
+    } catch (err) {
+      console.log("Trigger error:", err);
+    }
+  };
+
+  runDailyTrigger();
+}, []);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -224,7 +285,26 @@ export default function Home() {
       }
     }
   };
+  const getWeeklyTriggerCount = () => {
+  if (!userData?.triggerHistory) return 0;
 
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(now.getDate() - now.getDay());
+  start.setHours(0, 0, 0, 0);
+
+  return userData.triggerHistory.filter((t: any) => {
+    let d;
+
+    if (t.date?.seconds) {
+      d = new Date(t.date.seconds * 1000); // Firestore timestamp
+    } else {
+      d = new Date(t.date); // JS Date
+    }
+
+    return d >= start;
+  }).length;
+};
   if (loading) {
     return (
       <View style={styles.loader}>
@@ -257,7 +337,7 @@ export default function Home() {
           <View style={styles.card}>
             <Text style={styles.label}>Policy Status</Text>
             <Text style={styles.value}>
-              {userData?.policyActive ? "Active ✅" : "Inactive ❌"}
+              {userData?.policyActive ? "Active " : "Inactive "}
             </Text>
           </View>
 
@@ -272,6 +352,11 @@ export default function Home() {
             <Text style={styles.label}>Credits</Text>
             <Text style={styles.value}>{credits}</Text>
           </View>
+
+          <Text style={styles.value}>
+            {getWeeklyTriggerCount()} / 3
+          </Text>
+
 
           {/* PAYMENT */}
           <TouchableOpacity
@@ -300,7 +385,7 @@ export default function Home() {
             <Text style={styles.buttonText}>Edit Profile</Text>
           </TouchableOpacity>
 
-          {/* 🔥 POLICY DETAILS BUTTON */}
+          {/*  POLICY DETAILS BUTTON */}
           <TouchableOpacity
             style={[styles.button, { backgroundColor: "#444" }]}
             onPress={() => router.push("/policy")}
