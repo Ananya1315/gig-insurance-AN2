@@ -402,6 +402,6 @@ Suspicious:
 
 ### Implementation update
 
-* Frontend deployed link : [Frontend](https://delicare415113.netlify.app/)
-* Backend Node Server deployed link : [For curfew and festival details](https://gig-backend-zxt5.onrender.com/admin)
+* Frontend deployed link : [https://delicare415113.netlify.app/]
+* Backend Node Server deployed link : [https://gig-backend-zxt5.onrender.com/admin]
 * Flask backend deployment is not included in the free version due to space and resource constraints
