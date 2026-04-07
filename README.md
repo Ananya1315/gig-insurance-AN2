@@ -315,13 +315,14 @@ AI generates **confidence score**
 * Registration + payslip upload
 * Policy creation
 * Risk calculation
+* Trigger system
+* Claim system
 
 ### Phase 3
 
-* Trigger system
 * Fraud detection
 * Payout system
-* Dashboard
+* Admin Dashboard
 * Final UI & deployment
 
 ---
@@ -398,3 +399,9 @@ Suspicious:
 * Scalable AI-based system
 
 ---
+
+### Implementation update
+
+* Frontend deployed link : [Frontend](https://delicare415113.netlify.app/)
+* Backend Node Server deployed link : [For curfew and festival details](https://gig-backend-zxt5.onrender.com/admin)
+* Flask backend deployment is not included in the free version due to space and resource constraints
